@@ -1,74 +1,11 @@
-library(shiny)
-library(ggplot2)
-library(gtable)
-library(grid)
-library(reshape2)
-library(lubridate)
-library(scales)
-library(googleVis)
-library(devtools)
-library(plotly)
 
-city <- c()
-city$Delhi <- c("","Gurgaon","Ghaziabad","New Delhi"," New Delhi","Gurgaon ","Chittaranjan Park,"," Sainik Farms","Gurgaon<br>","Noida ","Noida","Delhi","East Delhi","Kaushambi","Gurgaon,Haryana","Greater Noida","South Delhi","NOIDA","East Delhi","North Delhi","Indirapuram","West Delhi","Ghaziabad","Central Delhi")
-city$Bangalore <- c("Bangalore","Bengaluru","Koramangala","Banglore","BANGALORE","Bangalore ","BTM")
-city$Pune <- c("Pune")
-city$Mumbai <- c("Mumbai","Goa")
 
-vn_name <- paste("./Data/vn_2015-04-22",".csv",sep="")
-vn1 <- read.csv(vn_name)
-vn1$Day <- as.Date(vn1$call_details_added)
-vn1 <- vn1[is.na(vn1$Day)==F,]
-vn1$Hour <- as.factor(hour(vn1$call_details_added))
-vn1$Week <- as.integer(strftime(vn1$Day,"%W"))+1
-vn1$user_new_old <- as.factor(vn1$user_new_old)
-vn1$Wday <- wday(vn1$Day,label=T,abbr=F)
-vn1 <- vn1[vn1$cloud_site_name!="Cafe Galley",]
-vn1 <- vn1[vn1$call_status!="__undefined__",]
-vn1$City <- "New City"
-vn1[vn1$city %in% city[[1]],]$City <- names(city[1])
-vn1[vn1$city %in% city[[2]],]$City <- names(city[2])
-vn1[vn1$city %in% city[[3]],]$City <- names(city[3])
-vn1[vn1$city %in% city[[4]],]$City <- names(city[4])
-vn2 <- vn1
-vn1 <- vn1[vn1$Day>="2015-01-01",]
-
-visits <- read.csv("./Data/GA_Channel.csv")
-colnames(visits)<- tolower(colnames(visits))
-colnames(visits)<- c("client","date","channel","user.type","device","sessions","bounces","transactions","transaction.revenue","session.duration")
-visits$date <- as.Date(visits$date)
-visits$week <- as.integer(strftime(visits$date,"%W"))+1
-
-oo_name <- paste("./Data/oo_2015-04-22",".csv",sep="")
-oo1 <- read.csv(oo_name)
-oo1$Day <- as.Date(oo1$order_added)
-oo1 <- oo1[is.na(oo1$Day)==F,]
-oo1$Hour <- as.factor(hour(oo1$order_added))
-oo1$Week <- as.integer(strftime(oo1$Day,"%W"))+1
-oo1$user_new_old <- as.factor(oo1$user_new_old)
-oo1$Wday <- wday(oo1$Day,label=T,abbr=F)
-oo1 <- oo1[oo1$cloud_site_name!="Cafe Galley",]
-oo1$City <- "New City"
-oo1[oo1$city_name %in% city[[1]],]$City <- names(city[1])
-oo1[oo1$city_name %in% city[[2]],]$City <- names(city[2])
-oo1[oo1$city_name %in% city[[3]],]$City <- names(city[3])
-oo1[oo1$city_name %in% city[[4]],]$City <- names(city[4])
-oo2 <- oo1
-oo1 <- oo1[oo1$Day>="2015-01-01",]
-
-adwords <- read.csv("./Data/Adwords.csv")
-clients <- read.csv("./Data/AdwordsClient.csv")
-adwords$Day <- as.Date(adwords$Day)
-adwords$Week <- as.integer(strftime(adwords$Day,"%W"))+1
-
-user <- read.csv("./Data/Users.csv")
-
-shinyServer(function(input, output) {
+shinyServer(function(input, output,session) {
 
 	output$dashboard<- renderGvis({
 
 
-		aa <- dcast(visits,client+date~'session_sum'.,sum,value.var="sessions")
+		aa <- dcast(visits,client+date~.,sum,value.var="sessions")
 		bb <- dcast(visits,client+date~.,sum,value.var="transactions")
 		cc <- merge(aa,bb,by=c("client","date"))
 		names(cc) <- c("Client","Date","Sessions","Transactions")
@@ -77,34 +14,58 @@ shinyServer(function(input, output) {
 													 timevar="Date")
 		Motion
 	})
+  
 
 	# a large table, reative to input$show_vars
-	output$plot <- renderPlot({
-		vn12 <- vn1[vn1$Day >=input$dateRange2[1]&vn1$Day <=input$dateRange2[2],]
-		if(input$city!="All")
-		{	c <- city[names(city)==input$city]
-			vn12 <- vn12[vn12$city %in% c[[1]],]
-			if (input$client != "All"&input$usertype != "All"){
-				vn12 <- vn12[vn12$cloud_site_name == as.character(input$client)&vn12$user_new_old == as.character(input$usertype),]
-			}
-			if (input$client != "All"&input$usertype == "All"){
-				vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
-			}
-			if (input$usertype != "All"&input$client == "All"){
-				vn12 <- vn12[vn12$user_new_old == as.character(input$usertype),]
-			}
-		}
-		if(input$city=="All")
-		{			if (input$client != "All"&input$usertype != "All"){
-			vn12 <- vn12[vn12$cloud_site_name == as.character(input$client)&vn12$user_new_old == as.character(input$usertype),]
-		}
-		if (input$client != "All"&input$usertype == "All"){
-			vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
-		}
-		if (input$usertype != "All"&input$client == "All"){
-			vn12 <- vn12[vn12$user_new_old == as.character(input$usertype),]
-		}
-		}
+	city1<-reactive({
+      if(input$city=="All"){
+        client_name_city <-oo1['cloud_site_name']
+      }
+      else{
+	    client_name_city <<- subset(oo1,City==as.character(input$city))['cloud_site_name']}
+	    #print(table(client_name_city))
+	    updateSelectInput(session,"client",
+	                      label="Client:",
+	                      choices=c("All",names(sort(table(client_name_city),decreasing=T))))
+	  })
+  change_event<-function(df1){
+	  
+	  df.change <- df1[df1$Day >=input$dateRange2[1]&df1$Day <=input$dateRange2[2],]
+	  if(input$city!="All")
+	  {
+	    city1()
+	    c <- city[names(city)==input$city]
+	    df.change <- df.change[df.change$city %in% c[[1]],]  
+	  }
+	  
+	  if (input$city!="All"&input$client != "All"&input$usertype != "All"){
+	    
+	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client)&df.change$user_new_old == as.character(input$usertype),]
+	  }
+	  if (input$city!="All"&input$client != "All"&input$usertype == "All"){
+	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client),]
+	  }
+	  if (input$city!="All"&input$usertype != "All"&input$client == "All"){
+	    df.change <- df.change[df.change$user_new_old == as.character(input$usertype),]
+	  }
+	  
+	  if(input$city=="All")
+	  {	city1()
+      if (input$client != "All"&input$usertype != "All"){
+	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client)&df.change$user_new_old == as.character(input$usertype),]
+	  }
+	  if (input$client != "All"&input$usertype == "All"){
+	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client),]
+	  }
+	  if (input$usertype != "All"&input$client == "All"){
+	    df.change <- df.change[df.change$user_new_old == as.character(input$usertype),]
+	  }
+	  }
+    print(df.change[1:1,])
+	  df.change
+	}
+  output$plot <- renderPlot({
+		vn12 <- change_event(vn1)
 
 		data <- vn12[vn12$Week>=input$weekselect[1]&vn12$Week<=input$weekselect[2],]
 		if(input$range=="Week")
@@ -131,37 +92,13 @@ shinyServer(function(input, output) {
 		facets <- paste(input$facet_row_vn, '~', input$facet_col_vn)
 		if (facets != '. ~ .')
 			p <- p + facet_grid(facets)
-		#out <- py$ggplotly(p, kwargs=list(filename="facet_wrap", fileopt="overwrite"))
-		#out$response$url
-    print(p)
+      p
 	})
-	output$plot_oo <- renderGvis({
-		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
-		if(input$city!="All")
-		{	c <- city[names(city)==input$city]
-			oo12 <- oo12[oo12$city_name %in% c[[1]],]
-			if (input$client != "All"&input$usertype != "All"){
-				oo12 <- oo12[oo12$cloud_site_name == as.character(input$client)&oo12$user_new_old == as.character(input$usertype),]
-			}
-			if (input$client != "All"&input$usertype == "All"){
-				oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
-			}
-			if (input$usertype != "All"&input$client == "All"){
-				oo12 <- oo12[oo12$user_new_old == as.character(input$usertype),]
-			}
-		}
-		if(input$city=="All")
-		{			if (input$client != "All"&input$usertype != "All"){
-			oo12 <- oo12[oo12$cloud_site_name == as.character(input$client)&oo12$user_new_old == as.character(input$usertype),]
-		}
-		if (input$client != "All"&input$usertype == "All"){
-			oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
-		}
-		if (input$usertype != "All"&input$client == "All"){
-			oo12 <- oo12[oo12$user_new_old == as.character(input$usertype),]
-		}
-		}
 
+
+  output$plot_oo <- renderPlot({
+		
+    oo12<-change_event(oo1)
 		data <- oo12[oo12$Week>=input$weekselect[1]&oo12$Week<=input$weekselect[2],]
 		if(input$range=="Week")
 		{
@@ -187,9 +124,8 @@ shinyServer(function(input, output) {
 		facets <- paste(input$facet_row_oo, '~', input$facet_col_oo)
 		if (facets != '. ~ .')
 			p <- p + facet_grid(facets)
-      #py <-plotly()
-		  #out <- py$ggplotly(p, kwargs=list(filename="facet_wrap", fileopt="overwrite"))
-      gvisColumnChart(p)
+
+      p
 	})
 	output$plot_adwords <- renderPlot({
 		adwords2 <- adwords

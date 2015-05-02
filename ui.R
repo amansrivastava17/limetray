@@ -84,7 +84,7 @@ shinyUI(fluidPage(
 						 selectInput("client",
 						 						"Client:",
 						 						c("All"
-						 							,names(sort(table(oo1$cloud_site_name),decreasing=T)))
+						 							,names(sort(table(client_name_city),decreasing=T)))
 
 						 )),
 			column(5,offset=0,
