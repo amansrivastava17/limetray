@@ -44,7 +44,7 @@ shinyUI(fluidPage(
 			tabsetPanel(
 				id = 'dataset',
 
-				tabPanel("Online Order",plotOutput('plot_oo'),
+				tabPanel("Online Order",graphOutput('plot_oo'),
 								 conditionalPanel(
 								 	hr(),
 
@@ -67,7 +67,7 @@ shinyUI(fluidPage(
 								 					 						c(None='.', "User Type"='user_new_old',"Day of The Week"="Wday","Location Name"='location_name',"City"="City","Hour"="Hour"))
 								 		)
 
-								 	))),tabPanel("Virtual Number",plotOutput('plot'),conditionalPanel(
+								 	))),tabPanel("Virtual Number",graphOutput('plot'),conditionalPanel(
 								 		hr(),
 								 		fluidRow(
 								 			column(5,offset=0,

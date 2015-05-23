@@ -1,150 +1,154 @@
-
-
 shinyServer(function(input, output,session) {
 
 	output$dashboard<- renderGvis({
-
-
 		aa <- dcast(visits,client+date~.,sum,value.var="sessions")
 		bb <- dcast(visits,client+date~.,sum,value.var="transactions")
 		cc <- merge(aa,bb,by=c("client","date"))
 		names(cc) <- c("Client","Date","Sessions","Transactions")
-		Motion=gvisMotionChart(cc,
-													 idvar="Client",
-													 timevar="Date")
+		Motion=gvisMotionChart(cc,idvar="Client",timevar="Date")
 		Motion
 	})
   
-
-	# a large table, reative to input$show_vars
 	city1<-reactive({
-      if(input$city=="All"){
-        client_name_city <-oo1['cloud_site_name']
-      }
-      else{
-	    client_name_city <<- subset(oo1,City==as.character(input$city))['cloud_site_name']}
-	    #print(table(client_name_city))
-	    updateSelectInput(session,"client",
-	                      label="Client:",
-	                      choices=c("All",names(sort(table(client_name_city),decreasing=T))))
-	  })
-  change_event<-function(df1){
-	  
-	  df.change <- df1[df1$Day >=input$dateRange2[1]&df1$Day <=input$dateRange2[2],]
-	  if(input$city!="All")
-	  {
-	    city1()
-	    c <- city[names(city)==input$city]
-	    df.change <- df.change[df.change$city %in% c[[1]],]  
-	  }
-	  
-	  if (input$city!="All"&input$client != "All"&input$usertype != "All"){
-	    
-	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client)&df.change$user_new_old == as.character(input$usertype),]
-	  }
-	  if (input$city!="All"&input$client != "All"&input$usertype == "All"){
-	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client),]
-	  }
-	  if (input$city!="All"&input$usertype != "All"&input$client == "All"){
-	    df.change <- df.change[df.change$user_new_old == as.character(input$usertype),]
-	  }
-	  
-	  if(input$city=="All")
-	  {	city1()
-      if (input$client != "All"&input$usertype != "All"){
-	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client)&df.change$user_new_old == as.character(input$usertype),]
-	  }
-	  if (input$client != "All"&input$usertype == "All"){
-	    df.change <- df.change[df.change$cloud_site_name == as.character(input$client),]
-	  }
-	  if (input$usertype != "All"&input$client == "All"){
-	    df.change <- df.change[df.change$user_new_old == as.character(input$usertype),]
-	  }
-	  }
-    print(df.change[1:1,])
-	  df.change
+    	if(input$city=="All"){
+        	client_name_city <-oo1['cloud_site_name']
+      	}
+      	else{
+	    	client_name_city <<- subset(oo1,City==as.character(input$city))['cloud_site_name']}
+	   	    updateSelectInput(session,"client",label="Client:",
+	        	choices=c("All",names(sort(table(client_name_city),decreasing=T))))
+	  	})
+
+	weekday <- function(data,range,title)
+	{
+		if(range=="Week")
+			{
+				p <- ggplot(data, aes(x=factor(Week))) + geom_bar() + xlab("Weeks") + ylab("Total Orders")+ggtitle(title)
+			}
+			if(range=="Day")
+			{
+				p <- ggplot(data, aes(x=factor(Day))) + geom_bar() + xlab("Days") + ylab("Total Orders")+ggtitle(title)
+			}
+    p
+  
 	}
-  output$plot <- renderPlot({
-		vn12 <- change_event(vn1)
 
-		data <- vn12[vn12$Week>=input$weekselect[1]&vn12$Week<=input$weekselect[2],]
-		if(input$range=="Week")
+	plot_gg <- function(p,plot_id)
+	{
+		gg <- gg2fig(p)
+		gg$layout <- list(legend = list(
+			x = 1, 
+			y = 1, 
+			bgcolor = "transparent"))
+		return(list(list(
+			    	id = plot_id,
+			    	task = "newPlot",
+			    	data = gg$data,
+			    	layout= list(barmode = "stack")
+			  	)
+			))
+	}
+	plot_graph <- function(data,range,color,facet_col,facet_row,plot_id)
 		{
-			p <- ggplot(data, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders")
-		}
-		if(input$range=="Day")
-		{
-			p <- ggplot(data, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders")
-		}
-
-		if(input$color_vn!='.')
-		{if(input$color_vn=='user_new_old')
-		{p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("black", "red"),
-																												 name="User Type",breaks=c("1", "2"),
-																												 labels=c("New User", "Old User"))
-		}
-		if(input$color_vn!='user_new_old')
-		{str(input$color_vn)
-
-		 p <- p + aes_string(fill=input$color_vn)
-		}
-		}
-		facets <- paste(input$facet_row_vn, '~', input$facet_col_vn)
-		if (facets != '. ~ .')
-			p <- p + facet_grid(facets)
+		  p <-weekday(data,range,'')
+			if(color!='.')
+			{	if(color=='user_new_old')
+				{	
+					p <- p + aes(fill=factor(user_new_old)) + scale_fill_manual(values=c("black", "red"),name="User Type",
+																		breaks=c("1", "2"),labels=c("New User", "Old User"))
+				}
+				if(color!='user_new_old')
+				{
+					p <- p + aes_string(fill=color)
+				}
+			}
+			facets <- paste(facet_row, '~',facet_col)
+			if (facets != '. ~ .')
+				p <- p + facet_grid(facets)
+			p <-plot_gg(p,plot_id)
       p
-	})
+		}
 
-
-  output$plot_oo <- renderPlot({
-		
-    oo12<-change_event(oo1)
-		data <- oo12[oo12$Week>=input$weekselect[1]&oo12$Week<=input$weekselect[2],]
-		if(input$range=="Week")
+	change_event <- function(df1)
 		{
-			p <- ggplot(data, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders")
+			df.change <- df1[df1$Day >=input$dateRange2[1]&df1$Day <=input$dateRange2[2],]
+			if(input$city!="All")
+			{
+				city1()
+				c <- city[names(city)==input$city]
+			    df.change <- df.change[df.change$city %in% c[[1]],]  
+			}
+			  
+			if(input$city!="All"&input$client != "All"&input$usertype != "All")
+			{
+		    	df.change <- df.change[df.change$cloud_site_name == as.character(input$client)&df.change$user_new_old == as.character(input$usertype),]
+			}
+			if(input$city!="All"&input$client != "All"&input$usertype == "All")
+			{
+			    df.change <- df.change[df.change$cloud_site_name == as.character(input$client),]
+			}
+			if(input$city!="All"&input$usertype != "All"&input$client == "All")
+			{
+				df.change <- df.change[df.change$user_new_old == as.character(input$usertype),]
+			}
+			if(input$city=="All")
+			{
+				city1()
+				if(input$client != "All"&input$usertype != "All")
+				{
+			    	df.change <- df.change[df.change$cloud_site_name == as.character(input$client)&df.change$user_new_old == as.character(input$usertype),]
+			  	}
+			  	if(input$client != "All"&input$usertype == "All")
+			  	{
+			    	df.change <- df.change[df.change$cloud_site_name == as.character(input$client),]
+			  	}
+			  	if(input$usertype != "All"&input$client == "All")
+			  	{
+			    	df.change <- df.change[df.change$user_new_old == as.character(input$usertype),]
+			  	}
+			}
+			df.change
 		}
-		if(input$range=="Day")
+	output$plot <- renderGraph(
 		{
-			p <- ggplot(data, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders")
-		}
+			vn12 <- change_event(vn1)
+			data <- vn12[vn12$Week>=input$weekselect[1]&vn12$Week<=input$weekselect[2],]
+			plot <- plot_graph(data,input$range,input$color_vn,input$facet_col_vn,input$facet_row_vn,"plot")
+			plot
+		})
 
-		if(input$color_oo!='.')
-		{if(input$color_oo=='user_new_old')
-		{p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("black", "red"),
-																												 name="User Type",breaks=c("1", "2"),
-																												 labels=c("New User", "Old User"))
-		}
-		if(input$color_oo!='user_new_old')
-		{str(input$color_oo)
 
-		 p <- p + aes_string(fill=input$color_oo)
-		}
-		}
-		facets <- paste(input$facet_row_oo, '~', input$facet_col_oo)
-		if (facets != '. ~ .')
-			p <- p + facet_grid(facets)
-
-      p
-	})
-	output$plot_adwords <- renderPlot({
+	output$plot_oo <- renderGraph(
+		{
+			oo12<-change_event(oo1)
+			data <- oo12[oo12$Week>=input$weekselect[1]&oo12$Week<=input$weekselect[2],]
+			plot <- plot_graph(data,input$range,input$color_oo,input$facet_col_oo,input$facet_row_oo,"plot_oo")
+      plot
+		})
+	output$plot_adwords <- renderPlot(
+	{
 		adwords2 <- adwords
 		campaign <- "All"
 		if(input$client!="All")
-		{	campaign <- clients[clients$Client %in% as.character(input$client),]$Campaign}
-		if (campaign != "All"&input$network != "All"){
+		{	
+			campaign <- clients[clients$Client %in% as.character(input$client),]$Campaign
+		}
+		if (campaign != "All"&input$network != "All")
+		{
 			adwords2 <- adwords[adwords$Campaign %in% as.character(campaign)&adwords$Network == as.character(input$network),]
 		}
-		if (campaign != "All"&input$network == "All"){
+		if (campaign != "All"&input$network == "All")
+		{
 			adwords2 <- adwords[adwords$Campaign %in% as.character(campaign),]
 		}
-		if (input$network != "All"&campaign == "All"){
+		if (input$network != "All"&campaign == "All")
+		{
 			adwords2 <- adwords[adwords$Network == as.character(input$network),]
 		}
 
 		data2 <- adwords2[adwords2$Day >= input$dateRange2[1]&adwords2$Day <= input$dateRange2[2],]
 		data <- data2[data2$Week>=input$weekselect[1]&data2$Week<=input$weekselect[2],]
-		print(head(adwords))
+		#print(head(adwords))
 		# 		p <- ggplot(data, aes(x=factor(Week),y=Cost)) + geom_bar(stat="identity",position=position_dodge(),
 		# 																													 colour="black") + xlab("Weeks") + ylab("Total Spend")
 		#
@@ -163,12 +167,9 @@ shinyServer(function(input, output,session) {
 			aa <- dcast(data,Day+Network~.,sum,value.var=paste(input$bar))
 			bb <- dcast(data,Day+Network~.,sum,value.var=paste(input$line))
 			df <- merge(aa,bb,by=c("Day","Network"))
-
 		}
 		names(df) <- c(paste(input$range),"Network",paste(input$bar),paste(input$line))
-
 		grid.newpage()
-
 		# two plots
 		p1 <- ggplot(df, aes_string(input$range, input$bar)) + geom_bar(stat="identity") + theme_bw()
 		p1 <- p1 + aes(fill=Network) + scale_fill_manual(values=c("#999999", "green"))
@@ -198,161 +199,100 @@ shinyServer(function(input, output,session) {
 		grid.draw(g)
 
 	})
-	output$pieoo <- renderPlot({
+	output$pieoo <- renderPlot(
+	{
 		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
 		oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
 		try(pie(table(oo12$user_new_old),labels=c("New User","Old User"), main="User Distribution Online Order"))
 	})
-	output$basicoo <- renderPlot({
+	output$basicoo <- renderPlot(
+	{
 		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
 		oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{
-			p <- ggplot(oo12, aes(x=factor(Week))) + geom_bar(colour="green") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Weekwise Distribution - Online Orders")
-		}
-		if(input$range=="Day")
-		{
-			p <- ggplot(oo12, aes(x=factor(Day))) + geom_bar(colour="green") + xlab("Days") + ylab("Total Orders") + ggtitle("Weekwise Distribution - Online Orders")
-		}
-
-		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),
-																												labels=c("New User", "Old User"))
+		p <-weekday(oo12,input$range,"Weekwise Distribution - Online Orders")
+		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),labels=c("New User", "Old User"))
 		try(print(p))
 	})
-	output$locationoo <- renderPlot({
+	output$locationoo <- renderPlot(
+	{
 		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
 		oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
 		if(length(unique(oo12$location_name))>1)
 		{
-			if(input$range=="Week")
-			{
-				p <- ggplot(oo12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Locationwise Weekly Distribution - Online Orders")
-			}
-			if(input$range=="Day")
-			{
-				p <- ggplot(oo12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Locationwise Weekly Distribution - Online Orders")
-			}
-
+			p <-weekday(oo12,input$range,"Locationwise Weekly Distribution - Online Orders")
 			facets <- paste("location_name",'~.')
-			p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),
-																													labels=c("New User", "Old User")) + facet_grid(facets)
+			p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),labels=c("New User", "Old User")) + facet_grid(facets)
 			try(print(p))
 		}
 	})
 	output$wdayoo <- renderPlot({
 		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
 		oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{
-			p <- ggplot(oo12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Day of The Week - Online Orders")
-		}
-		if(input$range=="Day")
-		{
-			p <- ggplot(oo12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Day of The Week - Online Orders")
-		}
+		p <-weekday(oo12,input$range,"Day of The Week - Online Orders")
 		facets <- paste('.~',"Wday",sep="")
 		p <- p + aes(fill=Wday) + facet_grid(facets)
 		try(print(p))
 	})
-	output$timeoo <- renderPlot({
+	output$timeoo <- renderPlot(
+	{
 		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
 		oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{
-			p <- ggplot(oo12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Time of Orders - Online Orders")
-		}
-		if(input$range=="Day")
-		{
-			p <- ggplot(oo12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Time of Orders - Online Orders")
-		}
-
+		p <-weekday(oo12,input$range,"Time of Orders - Online Orders")
 		facets <- paste("Time",'~.')
-		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1","2"),
-																												labels=c("New User", "Old User")) + facet_grid(facets)
+		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1","2"),labels=c("New User", "Old User")) + facet_grid(facets)
 		try(print(p))
 	})
-	output$locationtimeoo <- renderPlot({
+	output$locationtimeoo <- renderPlot(
+	{
 		oo12 <- oo1[oo1$Day >=input$dateRange2[1]&oo1$Day <=input$dateRange2[2],]
 		oo12 <- oo12[oo12$cloud_site_name == as.character(input$client),]
 		if(length(unique(oo12$location_name))>1)
 		{
-			if(input$range=="Week")
-			{
-				p <- ggplot(oo12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Location &  Timewise - Online Orders")
-			}
-			if(input$range=="Day")
-			{
-				p <- ggplot(oo12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Location &  Timewise - Online Orders")
-			}
-
+			p <-weekday(oo12,input$range,"Location &  Timewise - Online Orders")
 			facets <- paste("location_name",'~',"Time",sep="")
-			p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),
-																													labels=c("New User", "Old User")) + facet_grid(facets)
+			p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),labels=c("New User", "Old User")) + facet_grid(facets)
 			try(print(p))
 		}
 	})
-	output$pievn <- renderPlot({
+	output$pievn <- renderPlot(
+	{
 		vn12 <- vn1[vn1$Day >=input$dateRange2[1]&vn1$Day <=input$dateRange2[2],]
 		vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
 		try(pie(table(vn12$user_new_old),labels=c("New User","Old User"), main="User Distribution Virtual Number"))
 	})
 
-	output$basicvn <- renderPlot({
+	output$basicvn <- renderPlot(
+	{
 		vn12 <- vn1[vn1$Day >=input$dateRange2[1]&vn1$Day <=input$dateRange2[2],]
 		vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{p <- ggplot(vn12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Weekwise Distribution - Virtual Numbers")
-		}
-		if(input$range=="Day")
-		{p <- ggplot(vn12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Weekwise Distribution - Virtual Numbers")
-		}
-
-		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),
-																												labels=c("New User", "Old User"))
+		p <-weekday(oo12,input$range,"Weekwise Distribution - Virtual Numbers")
+		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),labels=c("New User", "Old User"))
 		try(print(p))
 	})
-	output$basicvncall <- renderPlot({
+	output$basicvncall <- renderPlot(
+	{
 		vn12 <- vn1[vn1$Day >=input$dateRange2[1]&vn1$Day <=input$dateRange2[2],]
 		vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{p <- ggplot(vn12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Weekwise Distribution(Call Type) - Virtual Numbers")
-		}
-		if(input$range=="Day")
-		{p <- ggplot(vn12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Weekwise Distribution(Call Type) - Virtual Numbers")
-		}
-
+		p <-weekday(oo12,input$range,"Weekwise Distribution(Call Type) - Virtual Numbers")
 		p <- p + aes(fill=call_status)
 		try(print(p))
 	})
-	output$wdayvn <- renderPlot({
+	output$wdayvn <- renderPlot(
+	{
 		vn12 <- vn1[vn1$Day >=input$dateRange2[1]&vn1$Day <=input$dateRange2[2],]
 		vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{
-			p <- ggplot(vn12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Week of the Day Distribution - Virutal Numbers")
-		}
-		if(input$range=="Day")
-		{
-			p <- ggplot(vn12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Week of the Day Distribution - Virutal Numbers")
-		}
-
+		p <-weekday(oo12,input$range,"Week of the Day Distribution - Virutal Numbers")
 		facets <- paste('.~',"Wday",sep="")
 		p <- p + aes(fill=Wday) + facet_grid(facets)
 		try(print(p))
 	})
-	output$timevn <- renderPlot({
+	output$timevn <- renderPlot(
+	{
 		vn12 <- vn1[vn1$Day >=input$dateRange2[1]&vn1$Day <=input$dateRange2[2],]
 		vn12 <- vn12[vn12$cloud_site_name == as.character(input$client),]
-		if(input$range=="Week")
-		{p <- ggplot(vn12, aes(x=factor(Week))) + geom_bar(colour="black") + xlab("Weeks") + ylab("Total Orders") + ggtitle("Time of Order - Virtual Numbers")
-		}
-		if(input$range=="Day")
-		{p <- ggplot(vn12, aes(x=factor(Day))) + geom_bar(colour="black") + xlab("Days") + ylab("Total Orders") + ggtitle("Time of Order - Virtual Numbers")
-		}
-
+		p <-weekday(oo12,input$range,"Time of Order - Virtual Numbers")
 		facets <- paste("Time",'~.')
-		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),
-																												labels=c("New User", "Old User")) + facet_grid(facets)
+		p <- p + aes(fill=user_new_old) + scale_fill_manual(values=c("green", "grey"),name="User Type",breaks=c("1", "2"),labels=c("New User", "Old User")) + facet_grid(facets)
 		try(print(p))
 	})
 	output$user_rep <- renderPlot({
